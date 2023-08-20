@@ -1,23 +1,14 @@
-from time import sleep
 from pathlib import Path
 
-from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
 from imageScanner.forms import UserImage
-from .models import UploadImage
-import os
 
 from google.oauth2 import service_account
 from google.cloud import vision
 from openai.embeddings_utils import cosine_similarity
-import argparse
 import io
-import pandas
 import openai
-from multiprocessing import Process
-import nltk
-import ssl
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
@@ -49,18 +40,12 @@ def analyze_image(image_path, client_creds, feature_types):
 def labels_df(response: vision.AnnotateImageResponse):
     tags = ''
     for label in response.label_annotations:
-        print(
-            f"{label.score:4.0%}",
-            f"{label.description:5}",
-            sep=" | ",
-        )
         tags = tags + " " + str(label.description)
     return tags
 
 
 def text_df(response: vision.AnnotateImageResponse):
     tags = ''
-    count = 0
     for page in response.full_text_annotation.pages:
         for block in page.blocks:
             for paragraph in block.paragraphs:
@@ -68,7 +53,6 @@ def text_df(response: vision.AnnotateImageResponse):
                     word_text = ''.join([
                         symbol.text for symbol in word.symbols
                     ])
-                    print(word.confidence, word_text)
                     tags = tags + " " + str(word_text)
     return tags
 
@@ -82,8 +66,6 @@ def search_reviews(df, product_description, n=5, pprint=True):
     embedding = get_embedding(product_description, model='text-embedding-ada-002')
     df['similarities'] = df.ada_embedding.apply(lambda x: cosine_similarity(x, embedding))
     res = df.sort_values('similarities', ascending=False).head(n)
-    print(res)
-    print(res['similarities'].mean())
     return res['similarities'].mean()
 
 
@@ -131,11 +113,9 @@ def image_request(request):
 
             # cosine formula
             for i in range(len(rvector)):
-                print(l1[i], l2[i])
                 c += l1[i] * l2[i]
             cosine = c / float((sum(l1) * sum(l2)) ** 0.5)
             score = cosine
-            print(cosine)
             if score >= 0.05:
                 result = "User complaint prose matches the image attatched"
             else:
